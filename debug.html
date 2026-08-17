@@ -33,7 +33,17 @@
 <a href="debug.html">⚙ デバック</a>
 <a href="2nd/login.html">🔐 ログイン</a>
 </nav>
-
+<script>
+function toggleMenu() {
+const menu = document.getElementById("sideMenu");
+menu.classList.toggle("open");
+}
+document.querySelectorAll("#sideMenu a").forEach(link => {
+link.addEventListener("click", function() {
+document.getElementById("sideMenu").classList.remove("open");
+});
+});
+</script>
 <script>
 setInterval(() => {
 location.reload();
