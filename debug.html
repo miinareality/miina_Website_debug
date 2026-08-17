@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>debug - miina web site</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div>
+<p> ❕　注意　このページは通常では表示されないようにしています。
+このページで行う行動で受ける損害は、補償しませんのでよろしくお願いします。</p>
+<!-- メニューボタン -->
+<button id="menuButton" class="menu-button" onclick="toggleMenu()">☰ メニュー</button>
+</div>
+<section class="content">
+<p><a href="https://miinareality.github.io/miina_website/2nd/login.html" target="_blank" > 2nd login html</a>
+<p><a href="2nd/dice.html" target="_blank" > 2nd dice html</a>
+<p><a href="2nd/business.html" target="_blank" > 2nd business html</a>
+<p><a href="2nd/materials.html" target="_blank" > 2nd materials html</a>
+<p><a href="2nd/member.html" target="_blank" > 2nd member html</a>
+<p><a href="https://github.com/miinareality/miina_website" target="_blank" > Github miina_website</a>
+<p><a href="2nd/memo.html"target="_blank">📝 メモ帳</a></p>
+<p>1st dice html disable</p><p>1st business html disable</p><p>1st materials html disable</p><p>1st member html disable</p>
+<!-- 右側メニュー -->
+<nav id="sideMenu" class="side-menu">
+<h2>メニュー</h2>
+
+<a href="./">🏠 ホーム</a>
+<a href="2nd/dice.html">🎲 ダイス</a>
+<a href="2nd/member.html">🙍 バッチ取得者への待遇</a>
+<a href="2nd/materials.html">🖼 使用素材</a>
+<a href="2nd/business.html">💼 企業様への連絡</a>
+<a href="2nd/login.html">🔐 ログイン</a>
+</nav>
+<!-- 現在のアカウント状態 -->
+<div id="account-status" class="account-status-collapsed"
+     role="button"
+     tabindex="0"
+     aria-expanded="false"
+     aria-label="アカウント状態を開く">
+    <div id="account-status-toggle" aria-hidden="true">☰</div>
+    <div id="account-status-panel">
+        <h3>アカウント状態</h3>
+        <div id="account-status-content">読み込み中...</div>
+    </div>
+</div>
+
+<script>
+
+function toggleAccountStatus() {
+    const account = document.getElementById("account-status");
+    if (!account) return;
+
+    const expanded = account.classList.toggle("account-status-expanded");
+    account.classList.toggle("account-status-collapsed", !expanded);
+    account.setAttribute("aria-expanded", String(expanded));
+    account.setAttribute(
+        "aria-label",
+        expanded ? "アカウント状態を閉じる" : "アカウント状態を開く"
+    );
+}
+
+const accountStatus = document.getElementById("account-status");
+if (accountStatus) {
+    accountStatus.addEventListener("click", (event) => {
+        // ログインリンクなど、内部の操作は開閉クリックとして扱わない。
+        if (event.target.closest("a, button, input, textarea, select")) return;
+        toggleAccountStatus();
+    });
+
+    accountStatus.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            toggleAccountStatus();
+        }
+    });
+}
+
+function toggleMenu() {
+const menu = document.getElementById("sideMenu");
+menu.classList.toggle("open");
+}
+
+document.querySelectorAll("#sideMenu a").forEach(link => {
+link.addEventListener("click", function() {
+document.getElementById("sideMenu").classList.remove("open");
+});
+});
+</script>
+
+<script>
+setInterval(() => {
+location.reload();
+}, 120 * 1000);
+</script>
+
+<script src="2nd/auth.js"></script>
+<script src="2nd/debug-auth.js"></script>
+</body>
+</html>
