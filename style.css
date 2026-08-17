@@ -117,38 +117,31 @@ body {
 
 /* コンテンツ */
 .content {
-    background-color: white;
-    margin: 20px 30px;
-    padding: 25px;
-    border-radius: 10px;
-}
+        background-color: white;
+        margin: 15px;
+        padding: 20px;
+        border-radius: 10px;
+    }
 
-.content h2 {
-    color: #0066cc;
-    border-bottom: 2px solid #0066cc;
-    padding-bottom: 8px;
-}
+    .content h2 {
+        font-size: 20px;
+        padding-bottom: 6px;
+        margin-top: 0;
+    }
 
-.content p {
-    font-size: 17px;
-    line-height: 1.8;
-}
+    .content p {
+        font-size: 14px;
+        line-height: 1.8;
+    }
 
-.content li {
-    margin-bottom: 10px;
-    font-size: 17px;
-}
+    .content li {
+        font-size: 14px;
+        margin-bottom: 8px;
+    }
 
-.content a {
-    color: #0066cc;
-    text-decoration: none;
-    font-weight: bold;
-}
-
-.content a:hover {
-    color: #ff66aa;
-    text-decoration: underline;
-}
+    .content a {
+        font-size: 14px;
+    }
 
 /* アカウント状態（全HTML共通・折りたたみ式） */
 #account-status {
