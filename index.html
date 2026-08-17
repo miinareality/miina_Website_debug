@@ -78,7 +78,21 @@ document.getElementById("sideMenu").classList.remove("open");
 <script data-goatcounter="https://miina-reality-goatcounter.goatcounter.com/count" async src="https://gc.zgo.at/count.js">
 </script>
 
+<!-- 共通アカウント状態 -->
+<div id="account-status" class="account-status-collapsed"
+     role="button"
+     tabindex="0"
+     aria-expanded="false"
+     aria-label="アカウント状態を開く">
+    <div id="account-status-toggle" aria-hidden="true">☰</div>
+    <div id="account-status-panel">
+        <h3>アカウント状態</h3>
+        <div id="account-status-content">読み込み中...</div>
+    </div>
+</div>
+<script src="account-status.js"></script>
+<!-- このサイトの裏側を見ている皆さんこんにちは！ -->
 </body>
 </html>
 
-<!-- このサイトの裏側を見ている皆さんこんにちは！ -->
+
