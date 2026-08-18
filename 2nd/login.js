@@ -41,7 +41,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (window.MiinaLocalStorageSync) {
                 await MiinaLocalStorageSync.syncAll();
             }
-            show("ログインしました。index.htmlへ移動します。");
+            show("ログインしました。ホームへ移動します。");
             setTimeout(() => {
                 window.location.href = "../index.html";
             }, 300);
