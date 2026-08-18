@@ -37,7 +37,8 @@ document.addEventListener("DOMContentLoaded", () => {
         show("ログインしています……");
 
         try {
-            await MiinaAuth.signIn(emailValue, passwordValue);
+            const data = await MiinaAuth.signIn(emailValue, passwordValue);
+            await MiinaAuth.migrateGuestLocalStorageToUser(data?.user);
             show("ログインしました。debug.htmlへ移動します。");
             setTimeout(() => {
                 window.location.href = "../debug.html";

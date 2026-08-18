@@ -115,9 +115,155 @@ function formatAuthError(error) {
     return "認証処理でエラーが発生しました。もう一度お試しください。";
 }
 
+
+/* =========================================================
+   LocalStorage ユーザー別管理
+   ・未ログイン時: <baseKey>_guest
+   ・ログイン時:   <baseKey>_<Supabase user.id>
+   ・既存の旧キー(<baseKey>)は初回アクセス/ログイン時に移行
+   ========================================================= */
+
+const LOCAL_STORAGE_BASE_KEYS = [
+    "miina_memo",
+    "miina_dice_results",
+    "miina_dice_history"
+];
+
+function getGuestStorageKey(baseKey) {
+    return `${baseKey}_guest`;
+}
+
+function getUserStorageKey(baseKey, userId) {
+    if (!userId) return getGuestStorageKey(baseKey);
+    return `${baseKey}_${userId}`;
+}
+
+function getScopedStorageKey(baseKey, userId = null) {
+    try {
+        // 旧バージョンのキーが残っている場合は、まずゲスト用へ移動。
+        const legacyValue = localStorage.getItem(baseKey);
+        const guestKey = getGuestStorageKey(baseKey);
+        if (legacyValue !== null && localStorage.getItem(guestKey) === null) {
+            localStorage.setItem(guestKey, legacyValue);
+        }
+        if (legacyValue !== null) {
+            localStorage.removeItem(baseKey);
+        }
+    } catch (error) {
+        console.error("LocalStorageキーの移行に失敗しました:", error);
+    }
+
+    return userId ? getUserStorageKey(baseKey, userId) : getGuestStorageKey(baseKey);
+}
+
+function readLocalValue(key) {
+    try {
+        return localStorage.getItem(key);
+    } catch (error) {
+        console.error("LocalStorageの読み込みに失敗しました:", error);
+        return null;
+    }
+}
+
+function writeLocalValue(key, value) {
+    try {
+        localStorage.setItem(key, value);
+        return true;
+    } catch (error) {
+        console.error("LocalStorageへの保存に失敗しました:", error);
+        return false;
+    }
+}
+
+function removeLocalValue(key) {
+    try {
+        localStorage.removeItem(key);
+        return true;
+    } catch (error) {
+        console.error("LocalStorageの削除に失敗しました:", error);
+        return false;
+    }
+}
+
+function mergeJsonArrays(userValue, guestValue, maxItems, itemValidator = () => true) {
+    const parse = (value) => {
+        if (value === null) return [];
+        try {
+            const data = JSON.parse(value);
+            return Array.isArray(data) ? data.filter(itemValidator) : [];
+        } catch (_) {
+            return [];
+        }
+    };
+
+    const merged = [];
+    for (const item of [...parse(userValue), ...parse(guestValue)]) {
+        const duplicate = merged.some(existing => JSON.stringify(existing) === JSON.stringify(item));
+        if (!duplicate) merged.push(item);
+        if (merged.length >= maxItems) break;
+    }
+    return merged;
+}
+
+async function migrateGuestLocalStorageToUser(user) {
+    if (!user?.id) return false;
+
+    const userId = user.id;
+
+    try {
+        for (const baseKey of LOCAL_STORAGE_BASE_KEYS) {
+            // 旧キーが残っていれば、まずゲストキーへ移す。
+            const guestKey = getScopedStorageKey(baseKey);
+            const userKey = getUserStorageKey(baseKey, userId);
+            const guestValue = readLocalValue(guestKey);
+            const userValue = readLocalValue(userKey);
+
+            if (baseKey === "miina_memo") {
+                // メモは既存のユーザーデータを優先。ユーザーデータが空ならゲストメモを引き継ぐ。
+                if ((userValue === null || userValue === "") && guestValue !== null) {
+                    writeLocalValue(userKey, guestValue);
+                }
+            } else if (baseKey === "miina_dice_results") {
+                const merged = mergeJsonArrays(userValue, guestValue, 10);
+                if (merged.length > 0 || userValue !== null || guestValue !== null) {
+                    writeLocalValue(userKey, JSON.stringify(merged));
+                }
+            } else if (baseKey === "miina_dice_history") {
+                const merged = mergeJsonArrays(
+                    userValue,
+                    guestValue,
+                    3,
+                    item => typeof item === "string"
+                );
+                if (merged.length > 0 || userValue !== null || guestValue !== null) {
+                    writeLocalValue(userKey, JSON.stringify(merged));
+                }
+            }
+
+            // ログイン後に他ユーザーへ漏れないよう、ゲスト領域は空にする。
+            if (guestValue !== null) removeLocalValue(guestKey);
+        }
+
+        return true;
+    } catch (error) {
+        console.error("ログイン後のLocalStorage移行に失敗しました:", error);
+        return false;
+    }
+}
+
+async function getCurrentUser() {
+    const session = await getCurrentSession();
+    return session?.user ?? null;
+}
+
 window.MiinaAuth = {
     initializeSupabase,
     getCurrentSession,
+    getCurrentUser,
+    getGuestStorageKey,
+    getUserStorageKey,
+    getScopedStorageKey,
+    migrateGuestLocalStorageToUser,
     signIn,
     signUp,
     resendSignupConfirmation,

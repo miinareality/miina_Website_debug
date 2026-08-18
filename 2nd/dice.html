@@ -88,8 +88,27 @@
    ・ダイス式ログ：LocalStorage 最大3件 + dicelog.json 最大3件
    ========================================================= */
 
-const DICE_RESULTS_KEY = "miina_dice_results";
-const DICE_HISTORY_KEY = "miina_dice_history";
+const DICE_RESULTS_BASE_KEY = "miina_dice_results";
+const DICE_HISTORY_BASE_KEY = "miina_dice_history";
+let DICE_RESULTS_KEY = `${DICE_RESULTS_BASE_KEY}_guest`;
+let DICE_HISTORY_KEY = `${DICE_HISTORY_BASE_KEY}_guest`;
+let diceStorageReady = false;
+
+async function prepareDiceStorage() {
+    try {
+        if (window.MiinaAuth) {
+            const user = await MiinaAuth.getCurrentUser();
+            if (user) await MiinaAuth.migrateGuestLocalStorageToUser(user);
+            DICE_RESULTS_KEY = MiinaAuth.getScopedStorageKey(DICE_RESULTS_BASE_KEY, user?.id || null);
+            DICE_HISTORY_KEY = MiinaAuth.getScopedStorageKey(DICE_HISTORY_BASE_KEY, user?.id || null);
+        }
+    } catch (error) {
+        console.error("ダイスのログイン状態取得に失敗しました:", error);
+        DICE_RESULTS_KEY = `${DICE_RESULTS_BASE_KEY}_guest`;
+        DICE_HISTORY_KEY = `${DICE_HISTORY_BASE_KEY}_guest`;
+    }
+    diceStorageReady = true;
+}
 
 function readLocalArray(key) {
     try {
@@ -126,6 +145,7 @@ function getDiceResults() {
 }
 
 function saveDiceResult(input, total) {
+    if (!diceStorageReady) return;
     const results = getDiceResults();
     results.unshift({ expression: input, total });
     writeLocalArray(DICE_RESULTS_KEY, results, 10);
@@ -155,6 +175,7 @@ function getDiceHistory() {
 }
 
 function saveDiceHistory(input) {
+    if (!diceStorageReady) return;
     let history = getDiceHistory().filter(dice => dice !== input);
     history.unshift(input);
     writeLocalArray(DICE_HISTORY_KEY, history, 3);
@@ -266,11 +287,13 @@ function rollDice() {
 
 /* 履歴クリア */
 function clearDiceResults() {
+    if (!diceStorageReady) return;
     removeLocal(DICE_RESULTS_KEY);
     displayDiceResults();
 }
 
 function clearDiceHistory() {
+    if (!diceStorageReady) return;
     removeLocal(DICE_HISTORY_KEY);
     loadDiceHistory();
 }
@@ -292,11 +315,13 @@ document.querySelectorAll("#sideMenu a").forEach(link => {
     });
 });
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+    await prepareDiceStorage();
     displayDiceResults();
     loadDiceHistory();
 });
 </script>
+<script src="auth.js"></script>
 <!-- 共通アカウント状態 -->
 <div id="account-status" class="account-status-collapsed"
      role="button"

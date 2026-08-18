@@ -60,13 +60,25 @@
         return null;
     }
     async function update() {
-        const session=findSession();
-        if (!session?.access_token) { render(null); return; }
         try {
+            if (window.MiinaAuth) {
+                const user = await MiinaAuth.getCurrentUser();
+                render(user);
+                return;
+            }
+
+            const session=findSession();
+            if (!session?.access_token) { render(null); return; }
             const res=await fetch(`${SUPABASE_URL}/auth/v1/user`, {headers:{apikey:SUPABASE_KEY, Authorization:`Bearer ${session.access_token}`}, cache:"no-store"});
-            if (!res.ok) { render(null, res.status===401 ? "ログイン状態の有効期限が切れています。" : "認証状態を取得できませんでした。"); return; }
+            if (!res.ok) {
+                render(null, res.status===401 ? "ログイン状態の有効期限が切れています。" : "認証状態を取得できませんでした。");
+                return;
+            }
             render(await res.json());
-        } catch (e) { console.error("account status",e); render(null,"認証状態を取得できませんでした。"); }
+        } catch (e) {
+            console.error("account status",e);
+            render(null,"認証状態を取得できませんでした。");
+        }
     }
     setExpanded(false);
     update();
