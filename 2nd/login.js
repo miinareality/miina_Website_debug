@@ -41,9 +41,9 @@ document.addEventListener("DOMContentLoaded", () => {
             if (window.MiinaLocalStorageSync) {
                 await MiinaLocalStorageSync.syncAll();
             }
-            show("ログインしました。debug.htmlへ移動します。");
+            show("ログインしました。index.htmlへ移動します。");
             setTimeout(() => {
-                window.location.href = "../debug.html";
+                window.location.href = "../index.html";
             }, 300);
         } catch (error) {
             console.error("Login error:", error);
