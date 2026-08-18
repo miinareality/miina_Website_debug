@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>debug - miina web site</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div>
+<p> ❕　注意　このページは通常では表示されないようにしています。
+このページで行う行動で受ける損害は、補償しませんのでよろしくお願いします。</p>
+<!-- メニューボタン -->
+<button id="menuButton" class="menu-button" onclick="toggleMenu()">☰ メニュー</button>
+</div>
+<section class="content">
+<p><a href="2nd/login.html" target="_blank" > 2nd login html</a>
+<p><a href="2nd/dice.html" target="_blank" > 2nd dice html</a>
+<p><a href="2nd/business.html" target="_blank" > 2nd business html</a>
+<p><a href="2nd/materials.html" target="_blank" > 2nd materials html</a>
+<p><a href="2nd/member.html" target="_blank" > 2nd member html</a>
+<p><a href="https://github.com/miinareality/miina_website" target="_blank" > Github miina_website</a>
+<p><a href="2nd/memo.html"target="_blank">📝 メモ帳</a></p>
+<p>1st dice html disable</p><p>1st business html disable</p><p>1st materials html disable</p><p>1st member html disable</p>
+<!-- 右側メニュー -->
+<nav id="sideMenu" class="side-menu">
+<h2>メニュー</h2>
+<a href="./">🏠 ホーム</a>
+<a href="2nd/dice.html">🎲 ダイス</a>
+<a href="2nd/member.html">🙍 バッチ取得者への待遇</a>
+<a href="2nd/materials.html">🖼 使用素材</a>
+<a href="2nd/business.html">💼 企業様への連絡</a>
+<a href="debug.html">⚙ デバック</a>
+<a href="2nd/login.html">🔐 ログイン</a>
+<a href="2nd/memo.html">📝 メモ帳</a>
+</nav>
+<script>
+function toggleMenu() {
+const menu = document.getElementById("sideMenu");
+menu.classList.toggle("open");
+}
+document.querySelectorAll("#sideMenu a").forEach(link => {
+link.addEventListener("click", function() {
+document.getElementById("sideMenu").classList.remove("open");
+});
+});
+</script>
+<script>
+setInterval(() => {
+location.reload();
+}, 120 * 1000);
+</script>
+<!-- 共通アカウント状態 -->
+<div id="account-status" class="account-status-collapsed"
+     role="button"
+     tabindex="0"
+     aria-expanded="false"
+     aria-label="アカウント状態を開く">
+    <div id="account-status-toggle" aria-hidden="true">☰</div>
+    <div id="account-status-panel">
+        <h3>アカウント状態</h3>
+        <div id="account-status-content">読み込み中...</div>
+    </div>
+</div>
+<script src="2nd/auth.js"></script>
+<script src="3rd/account-status.js"></script></body>
+</html>
