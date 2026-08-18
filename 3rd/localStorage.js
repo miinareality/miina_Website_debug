@@ -1,284 +1,262 @@
 /*
  * =========================================================
- * Miina Website
- * LocalStorage <-> Supabase 同期
- *
- * ファイル:
  * 3rd/localStorage.js
+ * Miina Website
+ *
+ * LocalStorage <-> Supabase user storage
  *
  * 役割:
- * ・現在の localStorage を取得
- * ・ログインユーザーごとに Supabase へ保存
- * ・Supabase のデータを localStorage へ復元
+ * ・未ログイン時はゲスト用LocalStorageを使用
+ * ・ログイン後はユーザーIDごとのLocalStorage領域を使用
+ * ・ログイン時にゲストデータとクラウドデータを同期
+ * ・保存/削除時にSupabaseへ反映
  *
- * ※ Supabase本体の初期化は 2nd/auth.js が担当
+ * 注意:
+ * Supabase Authが使用する認証トークンなどは同期しません。
+ * 同期対象は、このファイルで定義したWebサイト用データだけです。
  * =========================================================
  */
-
-(function () {
+(() => {
     "use strict";
 
+    const CLOUD_TABLE = "miina_user_storage";
+
     /*
-     * ---------------------------------------------------------
-     * localStorage 全体をオブジェクト化
-     * ---------------------------------------------------------
+     * 現在のサイトでLocalStorageを使用しているキー。
+     * 新しいLocalStorage項目を同期したい場合はここへ追加してください。
      */
-    function getLocalStorageData() {
+    const BASE_KEYS = [
+        "miina_memo",
+        "miina_dice_results",
+        "miina_dice_history"
+    ];
 
-        const data = {};
-
-        for (let i = 0; i < localStorage.length; i++) {
-
-            const key = localStorage.key(i);
-
-            if (key === null) {
-                continue;
-            }
-
-            try {
-
-                data[key] = JSON.parse(
-                    localStorage.getItem(key)
-                );
-
-            } catch (error) {
-
-                /*
-                 * JSONとして読めない通常の文字列は
-                 * そのまま保存
-                 */
-                data[key] = localStorage.getItem(key);
-            }
-        }
-
-        return data;
+    function guestKey(baseKey) {
+        return `${baseKey}_guest`;
     }
 
+    function userKey(baseKey, userId) {
+        return userId ? `${baseKey}_${userId}` : guestKey(baseKey);
+    }
+
+    function read(key) {
+        try {
+            return localStorage.getItem(key);
+        } catch (error) {
+            console.error("LocalStorageの読み込みに失敗しました:", error);
+            return null;
+        }
+    }
+
+    function write(key, value) {
+        try {
+            localStorage.setItem(key, value);
+            return true;
+        } catch (error) {
+            console.error("LocalStorageへの保存に失敗しました:", error);
+            return false;
+        }
+    }
+
+    function remove(key) {
+        try {
+            localStorage.removeItem(key);
+            return true;
+        } catch (error) {
+            console.error("LocalStorageの削除に失敗しました:", error);
+            return false;
+        }
+    }
+
+    function parseJson(value, fallback) {
+        if (value === null || value === "") return fallback;
+
+        try {
+            return JSON.parse(value);
+        } catch (_) {
+            return fallback;
+        }
+    }
+
+    function uniqueArray(values, maxItems) {
+        const result = [];
+
+        for (const value of values) {
+            if (!result.some(item => JSON.stringify(item) === JSON.stringify(value))) {
+                result.push(value);
+            }
+
+            if (result.length >= maxItems) break;
+        }
+
+        return result;
+    }
 
     /*
-     * ---------------------------------------------------------
-     * Supabase → localStorage
-     * ---------------------------------------------------------
+     * 旧形式のキーが残っている場合だけゲスト領域へ移動。
+     * Authのキーなど、BASE_KEYSにないキーには触れません。
      */
-    async function restoreLocalStorageFromSupabase() {
+    function moveLegacyKeysToGuest() {
+        for (const baseKey of BASE_KEYS) {
+            const oldValue = read(baseKey);
+            const guest = guestKey(baseKey);
 
-        if (
-            typeof supabaseClient === "undefined" ||
-            !supabaseClient
-        ) {
-            console.error(
-                "localStorage同期: Supabaseが初期化されていません。"
-            );
-
-            return false;
-        }
-
-
-        /*
-         * 現在ログインしているユーザーを取得
-         */
-        const {
-            data: sessionData,
-            error: sessionError
-        } = await supabaseClient.auth.getSession();
-
-
-        if (sessionError) {
-
-            console.error(
-                "localStorage同期: セッション取得失敗",
-                sessionError
-            );
-
-            return false;
-        }
-
-
-        const session = sessionData?.session;
-
-
-        /*
-         * ログインしていなければ何もしない
-         */
-        if (!session) {
-
-            console.log(
-                "localStorage同期: 未ログインのため復元しません。"
-            );
-
-            return false;
-        }
-
-
-        const userId = session.user.id;
-
-
-        /*
-         * ユーザー自身の保存データを取得
-         *
-         * RLSにより auth.uid() = user_id のデータだけ
-         * 取得可能になっています。
-         */
-        const {
-            data,
-            error
-        } = await supabaseClient
-            .from("miina_user_storage")
-            .select("data")
-            .eq("user_id", userId)
-            .maybeSingle();
-
-
-        if (error) {
-
-            console.error(
-                "localStorage同期: Supabaseからの取得失敗",
-                error
-            );
-
-            return false;
-        }
-
-
-        /*
-         * まだ保存データが存在しない場合
-         */
-        if (!data) {
-
-            console.log(
-                "localStorage同期: 保存データがありません。"
-            );
-
-            return true;
-        }
-
-
-        const savedData = data.data;
-
-
-        if (
-            !savedData ||
-            typeof savedData !== "object"
-        ) {
-            return true;
-        }
-
-
-        /*
-         * SupabaseのデータをlocalStorageへ復元
-         */
-        Object.keys(savedData).forEach(function (key) {
-
-            const value = savedData[key];
-
-            if (typeof value === "string") {
-
-                localStorage.setItem(
-                    key,
-                    value
-                );
-
-            } else {
-
-                localStorage.setItem(
-                    key,
-                    JSON.stringify(value)
-                );
+            if (oldValue !== null && read(guest) === null) {
+                write(guest, oldValue);
             }
-        });
 
+            if (oldValue !== null) {
+                remove(baseKey);
+            }
+        }
+    }
 
-        console.log(
-            "localStorage同期: Supabase → localStorage 完了"
-        );
+    async function getUser() {
+        if (!window.MiinaAuth) return null;
+        return await MiinaAuth.getCurrentUser();
+    }
+
+    /*
+     * 未ログイン時に作ったゲストデータを、
+     * ログインしたユーザーの領域へ移す。
+     */
+    async function migrateGuestToUser(user) {
+        if (!user?.id) return false;
+
+        moveLegacyKeysToGuest();
+
+        for (const baseKey of BASE_KEYS) {
+            const guest = guestKey(baseKey);
+            const userKeyName = userKey(baseKey, user.id);
+
+            const guestValue = read(guest);
+            const userValue = read(userKeyName);
+
+            if (guestValue === null) continue;
+
+            if (baseKey === "miina_memo") {
+                if (userValue === null || userValue === "") {
+                    write(userKeyName, guestValue);
+                }
+            } else {
+                const guestArray = parseJson(guestValue, []);
+                const userArray = parseJson(userValue, []);
+
+                const maxItems =
+                    baseKey === "miina_dice_results" ? 10 : 3;
+
+                const merged = uniqueArray(
+                    [...userArray, ...guestArray],
+                    maxItems
+                );
+
+                write(userKeyName, JSON.stringify(merged));
+            }
+
+            remove(guest);
+        }
 
         return true;
     }
 
+    /*
+     * 現在ユーザーのLocalStorageデータを
+     * Supabaseのdata列に入れる形式へ変換。
+     */
+    function localDataForUser(userId) {
+        return {
+            memo: read(userKey("miina_memo", userId)) || "",
+            dice_results: parseJson(
+                read(userKey("miina_dice_results", userId)),
+                []
+            ),
+            dice_history: parseJson(
+                read(userKey("miina_dice_history", userId)),
+                []
+            )
+        };
+    }
+
+    function applyCloudData(userId, data) {
+        if (!data || typeof data !== "object") return;
+
+        const memo =
+            typeof data.memo === "string"
+                ? data.memo
+                : "";
+
+        const results =
+            Array.isArray(data.dice_results)
+                ? data.dice_results.slice(0, 10)
+                : [];
+
+        const history =
+            Array.isArray(data.dice_history)
+                ? data.dice_history
+                    .filter(value => typeof value === "string")
+                    .slice(0, 3)
+                : [];
+
+        write(
+            userKey("miina_memo", userId),
+            memo
+        );
+
+        write(
+            userKey("miina_dice_results", userId),
+            JSON.stringify(results)
+        );
+
+        write(
+            userKey("miina_dice_history", userId),
+            JSON.stringify(history)
+        );
+    }
+
+    async function getClient() {
+        if (!window.MiinaAuth) {
+            throw new Error("MiinaAuthが読み込まれていません。");
+        }
+
+        return await MiinaAuth.getSupabaseClient();
+    }
 
     /*
-     * ---------------------------------------------------------
-     * localStorage → Supabase
-     * ---------------------------------------------------------
+     * Supabase → LocalStorage
      */
-    async function saveLocalStorageToSupabase() {
+    async function pullFromCloud(user) {
+        if (!user?.id) return null;
 
-        if (
-            typeof supabaseClient === "undefined" ||
-            !supabaseClient
-        ) {
-            console.error(
-                "localStorage同期: Supabaseが初期化されていません。"
-            );
+        const client = await getClient();
 
-            return false;
-        }
+        const { data, error } = await client
+            .from(CLOUD_TABLE)
+            .select("data")
+            .eq("user_id", user.id)
+            .maybeSingle();
 
+        if (error) throw error;
 
-        /*
-         * 現在のログイン状態を確認
-         */
-        const {
-            data: sessionData,
-            error: sessionError
-        } = await supabaseClient.auth.getSession();
+        return data?.data ?? null;
+    }
 
+    /*
+     * LocalStorage → Supabase
+     */
+    async function pushToCloud(user, data = null) {
+        if (!user?.id) return false;
 
-        if (sessionError) {
+        const client = await getClient();
 
-            console.error(
-                "localStorage同期: セッション取得失敗",
-                sessionError
-            );
+        const payload =
+            data || localDataForUser(user.id);
 
-            return false;
-        }
-
-
-        const session = sessionData?.session;
-
-
-        /*
-         * 未ログインなら保存しない
-         */
-        if (!session) {
-
-            console.log(
-                "localStorage同期: 未ログインのため保存しません。"
-            );
-
-            return false;
-        }
-
-
-        const userId = session.user.id;
-
-
-        /*
-         * 現在のlocalStorageを取得
-         */
-        const localData = getLocalStorageData();
-
-
-        /*
-         * Supabaseへ保存
-         *
-         * user_id は primary key なので、
-         * upsert() によって
-         *
-         * ・初回 → INSERT
-         * ・既存 → UPDATE
-         *
-         * になります。
-         */
-        const {
-            error
-        } = await supabaseClient
-            .from("miina_user_storage")
+        const { error } = await client
+            .from(CLOUD_TABLE)
             .upsert(
                 {
-                    user_id: userId,
-                    data: localData,
+                    user_id: user.id,
+                    data: payload,
                     updated_at: new Date().toISOString()
                 },
                 {
@@ -286,44 +264,276 @@
                 }
             );
 
-
-        if (error) {
-
-            console.error(
-                "localStorage同期: Supabaseへの保存失敗",
-                error
-            );
-
-            return false;
-        }
-
-
-        console.log(
-            "localStorage同期: localStorage → Supabase 完了"
-        );
+        if (error) throw error;
 
         return true;
     }
 
+    /*
+     * ログイン時のメイン同期処理。
+     *
+     * 1. ゲストデータをユーザー領域へ移動
+     * 2. Supabaseからユーザーデータを取得
+     * 3. 初回ならLocalStorage → Supabase
+     * 4. 既存ならクラウドと履歴を統合
+     * 5. LocalStorageへ反映
+     */
+    let syncPromise = null;
+
+    async function syncAll() {
+        if (syncPromise) return await syncPromise;
+
+        syncPromise = (async () => {
+            moveLegacyKeysToGuest();
+
+            const user = await getUser();
+
+            if (!user?.id) {
+                return {
+                    loggedIn: false,
+                    cloudAvailable: false
+                };
+            }
+
+            await migrateGuestToUser(user);
+
+            let cloudData = null;
+
+            try {
+                cloudData = await pullFromCloud(user);
+            } catch (error) {
+                /*
+                 * SQL未実行・通信エラー等でも、
+                 * LocalStorage自体はそのまま利用できるようにする。
+                 */
+                console.warn(
+                    "Supabase同期を取得できませんでした。LocalStorageを継続使用します。",
+                    error
+                );
+
+                return {
+                    loggedIn: true,
+                    cloudAvailable: false,
+                    user
+                };
+            }
+
+            const local = localDataForUser(user.id);
+
+            /*
+             * 初めてログインしたユーザー。
+             */
+            if (cloudData === null) {
+                await pushToCloud(user, local);
+
+                return {
+                    loggedIn: true,
+                    cloudAvailable: true,
+                    direction: "local-to-cloud",
+                    user
+                };
+            }
+
+            /*
+             * 既存ユーザー。
+             * メモはクラウド優先。
+             * ダイス履歴はクラウドとLocalStorageを統合。
+             */
+            const mergedResults = uniqueArray(
+                [
+                    ...(Array.isArray(cloudData.dice_results)
+                        ? cloudData.dice_results
+                        : []),
+                    ...local.dice_results
+                ],
+                10
+            );
+
+            const mergedHistory = uniqueArray(
+                [
+                    ...(Array.isArray(cloudData.dice_history)
+                        ? cloudData.dice_history
+                        : []),
+                    ...local.dice_history
+                ],
+                3
+            );
+
+            const merged = {
+                memo:
+                    typeof cloudData.memo === "string"
+                        ? cloudData.memo
+                        : local.memo,
+
+                dice_results: mergedResults,
+                dice_history: mergedHistory
+            };
+
+            applyCloudData(user.id, merged);
+            await pushToCloud(user, merged);
+
+            return {
+                loggedIn: true,
+                cloudAvailable: true,
+                direction: "cloud-to-local",
+                user
+            };
+        })();
+
+        try {
+            return await syncPromise;
+        } finally {
+            syncPromise = null;
+        }
+    }
 
     /*
-     * ---------------------------------------------------------
-     * 外部から使用できるように公開
-     * ---------------------------------------------------------
+     * 個別保存。
+     * ログイン中なら同時にSupabaseへ保存。
      */
+    async function save(baseKey, value) {
+        if (!BASE_KEYS.includes(baseKey)) {
+            console.warn(
+                `同期対象外のLocalStorageキーです: ${baseKey}`
+            );
+        }
 
+        moveLegacyKeysToGuest();
+
+        const user = await getUser();
+        const key = userKey(baseKey, user?.id);
+
+        const saved = write(key, value);
+
+        if (saved && user?.id) {
+            try {
+                await pushToCloud(user);
+            } catch (error) {
+                console.warn(
+                    "クラウド同期に失敗しました。LocalStorageには保存されています。",
+                    error
+                );
+            }
+        }
+
+        return saved;
+    }
+
+    async function removeAndSync(baseKey) {
+        moveLegacyKeysToGuest();
+
+        const user = await getUser();
+        const key = userKey(baseKey, user?.id);
+
+        remove(key);
+
+        if (user?.id) {
+            try {
+                await pushToCloud(user);
+            } catch (error) {
+                console.warn(
+                    "削除内容のクラウド同期に失敗しました。",
+                    error
+                );
+            }
+        }
+    }
+
+    function getScopedKey(baseKey, userId = null) {
+        moveLegacyKeysToGuest();
+        return userKey(baseKey, userId);
+    }
+
+    /*
+     * login.htmlなどから明示的に呼ぶためのAPI。
+     */
     window.MiinaLocalStorageSync = {
+        get: () => {
+            const data = {};
 
-        get: getLocalStorageData,
+            for (const baseKey of BASE_KEYS) {
+                data[baseKey] = read(
+                    getScopedKey(baseKey)
+                );
+            }
 
-        restore: restoreLocalStorageFromSupabase,
+            return data;
+        },
 
-        save: saveLocalStorageToSupabase
+        restore: syncAll,
+        save: async () => {
+            const user = await getUser();
+
+            if (!user?.id) return false;
+
+            return await pushToCloud(
+                user,
+                localDataForUser(user.id)
+            );
+        },
+
+        syncAll
     };
 
+    /*
+     * 既存のdice-storage.js / memo.jsが使っている
+     * MiinaStorage APIもここから提供する。
+     *
+     * これによりstorage.jsへの依存をなくせる。
+     */
+    window.MiinaStorage = {
+        BASE_KEYS,
+        guestKey,
+        userKey,
+        getScopedKey,
+        read,
+        write,
+        remove,
+        getUser,
+        migrateGuestToUser,
+        localDataForUser,
+        pullFromCloud,
+        pushToCloud,
+        syncAll,
+        save,
+        removeAndSync
+    };
+
+    /*
+     * ページを開いた時点ですでにログイン済みなら同期。
+     * ログイン成功時にも同期。
+     *
+     * login.jsから明示的にsyncAll()を呼んだ場合も
+     * syncPromiseで二重実行を防ぐ。
+     */
+    if (window.MiinaAuth?.watchAuthState) {
+        MiinaAuth.watchAuthState((event, session) => {
+            if (
+                event === "INITIAL_SESSION" ||
+                event === "SIGNED_IN"
+            ) {
+                /*
+                 * Supabaseの認証イベントコールバック内で
+                 * awaitして認証APIを再度呼ばないようにする。
+                 */
+                setTimeout(() => {
+                    syncAll().catch(error => {
+                        console.error(
+                            "LocalStorage同期でエラーが発生しました:",
+                            error
+                        );
+                    });
+                }, 0);
+            }
+        }).catch(error => {
+            console.error(
+                "認証状態監視の開始に失敗しました:",
+                error
+            );
+        });
+    }
 
     console.log(
-        "Miina LocalStorage Sync 読み込み完了"
+        "Miina LocalStorage 同期システム読み込み完了"
     );
-
 })();

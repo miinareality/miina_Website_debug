@@ -38,8 +38,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         try {
             const data = await MiinaAuth.signIn(emailValue, passwordValue);
-            if (window.MiinaStorage) {
-                await MiinaStorage.syncAll();
+            if (window.MiinaLocalStorageSync) {
+                await MiinaLocalStorageSync.syncAll();
             }
             show("ログインしました。debug.htmlへ移動します。");
             setTimeout(() => {

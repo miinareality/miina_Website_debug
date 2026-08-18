@@ -2,7 +2,7 @@
    auth.js
    Supabase authentication core.
    Login UI is handled by login.js / login.html.
-   LocalStorage is handled by 3rd/storage.js.
+   LocalStorage synchronization is handled by 3rd/localStorage.js.
    Debug account status is handled by debug-auth.js.
    ========================================================= */
 
