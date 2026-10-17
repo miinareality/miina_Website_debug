@@ -311,3 +311,33 @@ body {
 
     #account-status.account-status-expanded { max-width: calc(100vw - 24px); }
 }
+
+/* アカウント状態のログアウト */
+.account-status-logout-area {
+    margin-top: 12px;
+}
+
+.account-status-logout-button {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid #d9534f;
+    border-radius: 7px;
+    background: white;
+    color: #d9534f;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.account-status-logout-button:hover:not(:disabled) {
+    background: #fff5f5;
+}
+
+.account-status-logout-button:disabled {
+    opacity: 0.65;
+    cursor: wait;
+}
+
+.account-status-error {
+    color: #d9534f;
+}

@@ -27,6 +27,29 @@ document.addEventListener("DOMContentLoaded", async () => {
             addLine("メールアドレス", session.user.email);
             addLine("ユーザーID", session.user.id);
             addLine("認証状態", session.user.email_confirmed_at ? "メール認証済み" : "メール未認証");
+
+            const button = document.createElement("button");
+            button.type = "button";
+            button.textContent = "ログアウト";
+            button.style.marginTop = "12px";
+            button.addEventListener("click", async (event) => {
+                event.stopPropagation();
+                button.disabled = true;
+                button.textContent = "ログアウトしています……";
+                try {
+                    await MiinaAuth.signOut();
+                } catch (error) {
+                    console.error("Debug logout error:", error);
+                    button.disabled = false;
+                    button.textContent = "ログアウト";
+                    const msg = document.createElement("div");
+                    msg.style.marginTop = "8px";
+                    msg.style.color = "red";
+                    msg.textContent = "ログアウトに失敗しました。";
+                    statusElement.appendChild(msg);
+                }
+            });
+            statusElement.appendChild(button);
         } else {
             const msg = document.createElement("div");
             msg.style.marginTop = "8px";
